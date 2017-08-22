@@ -50,9 +50,9 @@ null return JSON_NULL;
 any return ANY;
 type return TYPE;
 true |
-True return BOOLEAN_LITERAL;
+True {yylval.BOOLEAN_LITERAL = true; return BOOLEAN_LITERAL;}
 false |
-False return BOOLEAN_LITERAL;
+False { yylval.BOOLEAN_LITERAL = false; return BOOLEAN_LITERAL; }
 "{" return '{';
 "}" return '}';
 : return ':';
@@ -62,10 +62,10 @@ False return BOOLEAN_LITERAL;
 = return '=';
 "[" return '[';
 "]" return ']';
-{identifier} return ID;
+{identifier} {yylval.ID = addToStringTable(); return ID;}
 \? return '?';
 {string_literal1} |
-{string_literal2} return STRING_LITERAL;
+{string_literal2} { yylval.STRING_LITERAL = addToStringTable(); return STRING_LITERAL;}
 {number_literal}  return NUMBER_LITERAL;
 {blank}
 %%
@@ -73,3 +73,9 @@ False return BOOLEAN_LITERAL;
 void yyerror (char const *s) {
   fprintf (stderr, "line: %d\n%s\n", yylineno, s);
 }
+
+StringRef * addToStringTable() {
+    StringTable.push_front(string(yytext));
+    return new StringRef(StringTable.front());
+}
+
