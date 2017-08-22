@@ -41,11 +41,13 @@
 json
   : json_item {
     $$ = new Json;
-    $$->json_items.push_front($1);
+    $$->json_items.push_back($1);
+    json_root = $$;
   }
   | json json_item {
-    $1->json_items.push_front($2);
+    $1->json_items.push_back($2);
     $$ = $1;
+    json_root = $$;
   }
   ;
 
@@ -83,10 +85,10 @@ json_dict
   }
   ;
 
+/* NamedType */
 named_type
   : ID {
-    $$ = new NamedType;
-    $$->type = *$1;
+    $$ = new NamedType(new Type{*$1});
     delete $1;
   }
   | template_id {
@@ -105,11 +107,11 @@ dict_body
 dict_member_seq
   : dict_member {
     $$ = new DictBody;
-    $$->members.push_front($1);
+    $$->members.push_back($1);
   }
   | dict_member_seq dict_member {
     $$ = $1;
-    $$->members.push_front($2);
+    $$->members.push_back($2);
   }
   ;
 
@@ -129,7 +131,7 @@ dict_member
 type_or_value
   : type {
     $$ = new TypeOrValue;
-    $$->types.push_front($1);
+    $$->types.push_back($1);
   }
   | type2_seq {
     $$ = new TypeOrValue;
@@ -138,7 +140,7 @@ type_or_value
   }
   | type '=' values {
     $$ = new TypeOrValue;
-    $$->types.push_front($1);
+    $$->types.push_back($1);
     $$->values = std::move(*$3);
     delete $3;
   }
@@ -153,12 +155,12 @@ type_or_value
 type2_seq
   : type '|' type {
     $$ = new Types;
-    $$->push_front($3);
-    $$->push_front($1);
+    $$->push_back($3);
+    $$->push_back($1);
   }
   | type2_seq '|' type {
     $$ = $1;
-    $$->push_front($3);
+    $$->push_back($3);
   }
   ;
 
@@ -173,6 +175,7 @@ type
   ;
 
 /* Type */
+/* before name lookup, Type can store a name which should be resolved. */
 non_list_type
   : ID {
     $$ = new Type{*$1};
@@ -204,10 +207,7 @@ non_list_type
 /* TemplateID */
 template_id
   : ID '<' template_argument_list '>' {
-    $$ = new TemplateID($3); 
-    $$->name = *$1;
-    $$->temp = nullptr;
-    $$->body = nullptr;
+    $$ = new TemplateID(*$1, $3); 
     delete $1;
   }
   ;
@@ -224,11 +224,11 @@ list
 values
   : value {
     $$ = new Values;
-    $$->push_front($1);
+    $$->push_back($1);
   }
   | values '|' value {
     $$ = $1;
-    $$->push_front($3);
+    $$->push_back($3);
   }
   ;
 
@@ -280,12 +280,12 @@ dict_literal
 kv_seq
   : kv {
     DictLiteral * p = new DictLiteral;
-    p->members->push_front($1);
+    p->members->push_back($1);
     $$ = p;
   }
   | kv_seq kv {
     $$ = $1;
-    $$->members->push_front($2);
+    $$->members->push_back($2);
   }
   ;
 
@@ -308,11 +308,11 @@ list_literal
 val_seq
   : value {
     $$ = new ListLiteral;
-    $$->values->push_front($1);
+    $$->values->push_back($1);
   }
   | val_seq value {
     auto p = $1;
-    p->values->push_front($2);
+    p->values->push_back($2);
     $$ = p;
   }
   ;
@@ -320,8 +320,9 @@ val_seq
 /* JsonTemplate */
 json_template
   : INTERFACE ID '<'template_parameter_list '>' dict_body {
-    $$ = new JsonTemplate{$2, $4, $6};
+    $$ = new JsonTemplate{*$2, $4, $6};
     addTemplateDef(*$2, $$);
+    delete $2;
   }
   ;
 
@@ -329,20 +330,23 @@ json_template
 template_parameter_list
   : ID {
     $$ = new TemplateParameterList;
-    $$->push_front($1);
+    $$->push_back($1);
   }
   | template_parameter_list ID {
     $$ = $1;
-    $$->push_front($2);
+    $$->push_back($2);
   }
   ;
 
 /* TemplateArgumentList */
 template_argument_list
-  : type { $$ = new TemplateArgumentList(); }
+  : type {
+    $$ = new TemplateArgumentList();
+    $$->push_back($1);
+  }
   | template_argument_list type {
     $$ = $1;
-    $$->push_front($2);
+    $$->push_back($2);
   }
   ;
 
@@ -362,7 +366,7 @@ ns_member_seq
   }
   | ns_member_seq json_variable {
     $$ = $1;
-    $1->members.push_front($2);
+    $1->members.push_back($2);
   }
   ;
 
@@ -413,103 +417,18 @@ json_variable1
 /* JsonExport */
 json_export
   : EXPORT json_dict {
-    new JsonExport{$2};
+    $$ = new JsonExport{$2};
   }
   | EXPORT json_template {
-    new JsonExport{$2};
+    $$ = new JsonExport{$2};
   }
   | EXPORT json_namespace {
-    new JsonExport{$2};
+    $$ = new JsonExport{$2};
   }
   | EXPORT json_type {
-    new JsonExport{$2};
+    $$ = new JsonExport{$2};
   }
   ;
 
 %%
-int main() {
-  yydebug = 0;
-  int res = yyparse();
-  switch (res) {
-    case(0):
-      llvm::outs() << "yyparse() successfully finished.\n";
-      break;
-    case(1):
-      llvm::outs() << "yyparse() failed: invalid input.\n";
-      break;
-    case(2):
-      llvm::outs() << "yyparse() failed: memory exhaustion.\n";
-      break;
-    default:
-      llvm::outs() << "wrong return value from yyparse()\n";
-  }
-}
-
-StringMap<Value*> VariableTable;
-StringMap<JsonDict*> DictTable;
-StringMap<JsonTemplate*> TemplateTable;
-forward_list<string> StringTable;
-
-Value * addVariableDef(StringRef name, Value * v) {
-  bool ret = VariableTable.insert(make_pair(name, v)).second;
-  if (!ret) {
-    llvm::errs() << "error in addVariableDef(): variable already exists\n";
-    abort();
-  }
-  return v;
-}
-
-Value * getVariableValue(StringRef name) {
-  auto iter = VariableTable.find(name);
-  if (iter == VariableTable.end()) {
-    llvm::errs() << "error in getVariableValue(): variable not found\n";
-  }
-  return iter->getValue();
-}
-
-JsonDict * addDictDef(StringRef name, JsonDict * dict) {
-  bool ret = DictTable.insert(make_pair(name, dict)).second;
-  if (!ret) {
-    llvm::errs() << "error in addDictDef(): dict already exists\n";
-    abort();
-  }
-  return dict;
-}
-
-JsonDict * getDictDef(StringRef name) {
-  auto iter = DictTable.find(name);
-  if (iter == DictTable.end()) {
-    llvm::errs() << "error in getDictDef(): dict not found\n";
-    llvm::errs() << "line number: " << yylineno << '\n';
-    llvm::errs() << "dict name: " << name << '\n';
-    abort();
-  }
-  return iter->getValue();
-}
-
-JsonTemplate * addTemplateDef(StringRef name, JsonTemplate * temp) {
-  bool ret = TemplateTable.insert(make_pair(name, temp)).second;
-  if (!ret) {
-    llvm::errs() << "error in addTemplateDef(): template already exists\n";
-    abort();
-  }
-  return temp;
-}
-
-JsonTemplate * getTemplateDef(StringRef name) {
-  auto iter = TemplateTable.find(name);
-  if (iter == TemplateTable.end()) {
-    llvm::errs() << "error in getTemplateValue(): template not found\n";
-    llvm::errs() << "line number: " << yylineno << '\n';
-    llvm::errs() << "template name : " << name << '\n';
-    abort();
-  }
-  return iter->getValue();
-}
-
-namespace boost {
-void throw_exception( std::exception const & e ) {
-  llvm::errs() << "user provided boost::throw_exception() called.\naborting...\n";
-  abort();
-}
-}
+#include "main.cpp"

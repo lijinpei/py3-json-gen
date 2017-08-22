@@ -1,5 +1,6 @@
 *.in
 *.out
+*.swp
 json.tab.c
 json.tab.h
 lex.yy.c

@@ -1,13 +1,20 @@
+#ifndef REQUIRES_H
+#define REQUIRES_H
+
 #include "boost/variant/get.hpp"
 #include "boost/variant/variant.hpp"
+#include <boost/core/demangle.hpp>
+#include <functional>
+#include <typeinfo>
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/Twine.h"
 #include "llvm/Support/raw_ostream.h"
-#include <forward_list>
 #include <iostream>
 #include <string>
 #include <utility>
 #include <vector>
+#include <list>
 
 void yyerror(char const *s);
 extern "C" int yylex(void);
@@ -15,26 +22,14 @@ extern int yylineno;
 
 using std::vector;
 using std::string;
-using std::forward_list;
+using std::list;
+using llvm::Twine;
 using llvm::StringRef;
 using llvm::StringMap;
 using llvm::raw_ostream;
 using boost::variant;
 using boost::get;
 using std::make_pair;
-
-/* All the ast nodes must be move-able (perhaps except the root node) */
-/* p means move of this class is implemented through shared_ptr (as directly
- * move the class would be costly) */
-/* All the ast nodes that needs forward declaration can't be 'using, typedef' */
-/* All the string literals and names appears as StringRef to StringTable */
-/* All named types (including templates) appears as shared_ptr to NamedTypeTable
- */
-/* All ast node class appears directly in other ast node class (directly means
- * not throught pointer)
- * as all the ast node are cheap to move.
- * Except when the node needs to be merged with other same node */
-/* YYSTYPE is a variant of all the move-able ast nodes */
 
 /* To define Json */
 struct JsonDict;
@@ -48,16 +43,19 @@ using JsonItem = variant<JsonDict *, JsonTemplate *, JsonNamespace *,
                          JsonType *, JsonVariable *, JsonExport *>;
 
 struct Json {
-  forward_list<JsonItem *> json_items;
+  list<JsonItem *> json_items;
 };
 
 /* To define JsonDict */
+/* Type includes a dict name. After name lookup, the dict name will be replaced
+ * with the corresponding dict type. */
 struct Type;
 struct Value;
 
-using Types = forward_list<Type *>;
-using Values = forward_list<Value *>;
+using Types = list<Type *>;
+using Values = list<Value *>;
 
+/* type and value appeared in dict member can be distinguished by syntax. */
 struct TypeOrValue {
   Types types;
   Values values;
@@ -72,16 +70,21 @@ struct DictMember {
 };
 
 struct DictBody {
-  forward_list<DictMember *> members;
+  list<DictMember *> members;
 };
 
 struct TemplateID;
 struct NamedType {
-  variant<TemplateID *, StringRef> type;
-  NamedType(TemplateID *tid = nullptr) : type(tid) {}
+  variant<TemplateID *, Type*> type;
+  NamedType(std::nullptr_t np) : type() {}
+  NamedType(TemplateID * tid) : type(tid) {}
+  NamedType(Type * t) : type(t) {}
 };
 
-/* p */
+/* We only support concrete class as base.
+ * ie. we don't support template to extend template
+ * Currently, we conly support single inheritage.
+ */
 struct JsonDict {
   StringRef name;
   NamedType *base;
@@ -92,22 +95,23 @@ struct JsonDict {
 
 /* To define JsonTemplate */
 
-using TemplateParameterList = forward_list<StringRef *>;
+using TemplateParameterList = list<StringRef *>;
 /* p */
 struct JsonTemplate {
-  StringRef *name;
+  StringRef name;
   TemplateParameterList *temp_par_list;
   DictBody *body;
 };
 
-using TemplateArgumentList = forward_list<Type *>;
+using TemplateArgumentList = list<Type *>;
 
+/* Before name lookup, name store a template name which should be resolved */
 struct TemplateID {
-  JsonTemplate *temp;
   StringRef name;
   TemplateArgumentList *temp_arg_list;
+  JsonTemplate *temp;
   DictBody *body; // body after template instantiation
-  TemplateID(TemplateArgumentList *tal) : temp_arg_list(tal) {}
+  TemplateID(StringRef name, TemplateArgumentList *tal) : name(name), temp_arg_list(tal), temp(nullptr), body(nullptr) {}
 };
 
 /* To define Type */
@@ -147,13 +151,13 @@ struct StrValuePair {
 };
 
 struct DictLiteral {
-  forward_list<StrValuePair *> *members;
-  DictLiteral() : members(new forward_list<StrValuePair *>) {}
+  list<StrValuePair *> *members;
+  DictLiteral() : members(new list<StrValuePair *>) {}
 };
 
 struct ListLiteral {
-  forward_list<Value *> *values;
-  ListLiteral() : values(new forward_list<Value *>) {}
+  list<Value *> *values;
+  ListLiteral() : values(new list<Value *>) {}
 };
 
 /* We won't record which variable the value is form */
@@ -179,56 +183,18 @@ struct JsonType {
 
 struct JsonNamespace {
   StringRef name;
-  forward_list<JsonVariable *> members;
+  list<JsonVariable *> members;
 };
 
 struct JsonExport {
   variant<JsonDict *, JsonTemplate *, JsonNamespace *, JsonType *> exported;
 };
 
-// using my_yystype = variant<JsonItem, DictMember, DictBody, JsonDict,
-// JsonTemplate, TemplateParameterList, TemplateArgumentList, TemplateID,
-// NamedType, JsonList, Type, StringLiteral, BooleanLiteral, NumberLiteral,
-// StrValuePair, DictLiteral, ListLiteral, Value, JsonVariable, JsonNamespace,
-// JsonExport>;
-// using my_yystype = variant<JsonItem, Types, Values, TypeOrValue, DictMember,
-// DictBody, JsonDict, JsonTemplate, TemplateParameterList,
-// TemplateArgumentList, TemplateID, NamedType, JsonList, Type, StringLiteral,
-// BooleanLiteral, NumberLiteral, StrValuePair, DictLiteral, ListLiteral, Value,
-// JsonVariable, JsonNamespace, JsonExport>;
-union my_yystype {
-  int number;
-  bool boolean;
-  StringRef *p_str;
-  JsonItem *json_item;
-  JsonDict *json_dict;
-  JsonTemplate *json_template;
-  JsonNamespace *json_namespace;
-  JsonType *json_type;
-  JsonVariable *json_variable;
-  JsonExport *json_export;
-  DictBody *dict_body;
-  DictMember *dict_member;
-  TemplateParameterList *template_parameter_list;
-  TemplateArgumentList *template_argument_list;
-  TemplateID *template_id;
-  NamedType *named_type;
-  JsonList *json_list;
-  Type *type;
-  Value *value;
-  // Literal return Value *
-  StringLiteral *string_literal;
-  BooleanLiteral *boolean_literal;
-  NumberLiteral *number_literal;
-  DictLiteral *dict_literal;
-  ListLiteral *list_literal;
-  StrValuePair *str_value_pair;
-};
-
+extern Json * json_root;
 extern StringMap<Value *> VariableTable;
 extern StringMap<JsonDict *> DictTable;
 extern StringMap<JsonTemplate *> TemplateTable;
-extern forward_list<string> StringTable;
+extern list<string> StringTable;
 Value *addVariableDef(StringRef name, Value *v);
 Value *getVariableValue(StringRef name);
 JsonDict *addDictDef(StringRef name, JsonDict *dict);
@@ -236,3 +202,6 @@ JsonDict *getDictDef(StringRef name);
 JsonTemplate *addTemplateDef(StringRef name, JsonTemplate *temp);
 JsonTemplate *getTemplateDef(StringRef Name);
 StringRef *addToStringTable();
+
+void pre_dump();
+#endif // REQUIRES_H
