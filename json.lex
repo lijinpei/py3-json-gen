@@ -62,7 +62,7 @@ False { yylval.BOOLEAN_LITERAL = false; return BOOLEAN_LITERAL; }
 = return '=';
 "[" return '[';
 "]" return ']';
-{identifier} {yylval.ID = addToStringTable(); return ID;}
+{identifier} {yylval.ID = new IDRef(*addToStringTable()); return ID;}
 \? return '?';
 {string_literal1} |
 {string_literal2} { yylval.STRING_LITERAL = addToStringTable(); return STRING_LITERAL;}

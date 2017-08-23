@@ -5,7 +5,8 @@
 %define api.value.type union
 %locations
 %debug
-%token <StringRef *> ID STRING_LITERAL
+%token <IDRef *> ID
+%token <StringRef *> STRING_LITERAL
 %token INTERFACE NAMESPACE EXTENDS  EXPORT CONST TYPE BOOLEAN NUMBER STRING
 %token <SpecialValue> ANY JSON_NULL
 %token <bool> BOOLEAN_LITERAL
@@ -76,11 +77,11 @@ json_item
 /* JsonDict */
 json_dict
   : INTERFACE ID dict_body {
-    $$ = new JsonDict(*$2, nullptr, $3);
+    $$ = new JsonDict($2->name, nullptr, $3);
     delete $2;
   }
   | INTERFACE ID EXTENDS named_type dict_body {
-    $$ = new JsonDict(*$2, $4, $5);
+    $$ = new JsonDict($2->name, $4, $5);
     delete $2;
   }
   ;
@@ -88,7 +89,7 @@ json_dict
 /* NamedType */
 named_type
   : ID {
-    $$ = new NamedType(new Type{*$1});
+    $$ = new NamedType(new Type{$1->name});
     delete $1;
   }
   | template_id {
@@ -118,11 +119,11 @@ dict_member_seq
 /* DictMember */
 dict_member
   : ID ':' type_or_value {
-    $$ = new DictMember(*$1, $3, false);
+    $$ = new DictMember($1->name, $3, false);
     delete $1;
   }
   | ID '?'':' type_or_value {
-    $$ = new DictMember(*$1, $4, true);
+    $$ = new DictMember($1->name, $4, true);
     delete $1;
   }
   ;
@@ -178,7 +179,7 @@ type
 /* before name lookup, Type can store a name which should be resolved. */
 non_list_type
   : ID {
-    $$ = new Type{*$1};
+    $$ = new Type{$1->name};
     delete $1;
   }
   | template_id {
@@ -207,7 +208,7 @@ non_list_type
 /* TemplateID */
 template_id
   : ID '<' template_argument_list '>' {
-    $$ = new TemplateID(*$1, $3); 
+    $$ = new TemplateID($1->name, $3); 
     delete $1;
   }
   ;
@@ -236,7 +237,7 @@ values
 value
   : ID {
     fprintf(stderr, "getVariableValue()\n");
-    $$ = getVariableValue(*$1);
+    $$ = getVariableValue($1->name);
     delete $1;
   }
   | literal {
@@ -320,8 +321,8 @@ val_seq
 /* JsonTemplate */
 json_template
   : INTERFACE ID '<'template_parameter_list '>' dict_body {
-    $$ = new JsonTemplate{*$2, $4, $6};
-    addTemplateDef(*$2, $$);
+    $$ = new JsonTemplate{$2->name, $4, $6};
+    addTemplateDef($2->name, $$);
     delete $2;
   }
   ;
@@ -330,11 +331,11 @@ json_template
 template_parameter_list
   : ID {
     $$ = new TemplateParameterList;
-    $$->push_back($1);
+    $$->push_back(&($1->name));
   }
   | template_parameter_list ID {
     $$ = $1;
-    $$->push_back($2);
+    $$->push_back(&($2->name));
   }
   ;
 
@@ -354,7 +355,7 @@ template_argument_list
 json_namespace
   : NAMESPACE ID '{' ns_member_seq '}' {
     $$ = $4;
-    $$->name = *$2;
+    $$->name = ($2->name);
     delete $2;
   }
   ;
@@ -374,7 +375,7 @@ ns_member_seq
 json_type
   : TYPE ID '=' type {
     $$ = new JsonType;
-    $$->name = *$2;
+    $$->name = $2->name;
     delete $2;
     $$->type = $4;
   }
@@ -399,14 +400,14 @@ json_variable
 json_variable1
   : ID ':' type '=' value {
     $$ = new JsonVariable;
-    $$->name = *$1;
+    $$->name = $1->name;
     delete $1;
     $$->type = $3;
     $$->value = $5;
   }
   | ID '=' value {
     $$ = new JsonVariable;
-    $$->name = *$1;
+    $$->name = $1->name;
     delete $1;
     $$->type = nullptr;
     $$->value = $3;

@@ -87,26 +87,4 @@ JsonTemplate * getTemplateDef(StringRef name) {
   return iter->getValue();
 }
 
-class PreDumpVisitor : public boost::static_visitor<>{
-  public:
-    template <typename T>
-    void operator()(T *&operand, const Twine & prefix) const {
-      llvm::outs() <<  prefix << boost::core::demangle(typeid(T).name())
-                   << ' ' << operand->name << '\n';
-    }
-    void operator()(JsonExport * & operand, const Twine & prefix) const {
-      char str[] = "export: ";
-      llvm::outs() << prefix << str << '\n';
-      string str1(sizeof(str), ' ');
-      auto bound_visitor = std::bind(PreDumpVisitor(), std::placeholders::_1, prefix + str1);
-      boost::apply_visitor(bound_visitor, operand->exported);
-    }
-};
-
-void pre_dump() {
-  auto bound_visitor = std::bind(PreDumpVisitor(), std::placeholders::_1, "");
-  for (auto & item : json_root->json_items) {
-    boost::apply_visitor(bound_visitor, *item);
-  }
-}
-
+#include "pre_dump.cpp"

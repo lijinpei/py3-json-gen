@@ -160,13 +160,18 @@ struct ListLiteral {
   ListLiteral() : values(new list<Value *>) {}
 };
 
-/* We won't record which variable the value is form */
+struct IDRef {
+  StringRef name;
+  IDRef(StringRef name) : name(name) {}
+};
+
 struct Value {
-  variant<SpecialValue, StringRef *, bool, int, DictLiteral *, ListLiteral *>
+  variant<SpecialValue, IDRef *, StringRef *, bool, int, DictLiteral *,
+          ListLiteral *>
       value;
 };
 
-/* To define JsonVariable and JsonNamepace */
+/* To define JsonVariable and JsonNamespace */
 /* p */
 struct JsonVariable {
   StringRef name;
@@ -203,5 +208,5 @@ JsonTemplate *addTemplateDef(StringRef name, JsonTemplate *temp);
 JsonTemplate *getTemplateDef(StringRef Name);
 StringRef *addToStringTable();
 
-void pre_dump();
+#include "pre_dump.h"
 #endif // REQUIRES_H
