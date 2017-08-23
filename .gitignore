@@ -1,4 +1,3 @@
-*.in
 *.out
 *.swp
 json.tab.c

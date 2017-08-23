@@ -9,7 +9,15 @@
 #include <memory>
 
 static int line_num = 0;
-
+static int curly_bracket_depth = 0;
+#define ID_OR(x) {\
+  if (!curly_bracket_depth) {\
+    return x;\
+  } else {\
+    yylval.ID = addToStringTable();\
+    return ID;\
+  }\
+}
 %}
 
 %option yylineno
@@ -38,23 +46,23 @@ blank [,. \t]
 .*
 }
 \n ++line_num;
-interface return INTERFACE;
-extends return EXTENDS;
+interface ID_OR(INTERFACE)
+extends ID_OR(EXTENDS)
 const return CONST;
 export return EXPORT;
-namespace return NAMESPACE;
+namespace ID_OR(NAMESPACE)
 boolean return BOOLEAN;
 string return STRING;
 number return NUMBER;
 null return JSON_NULL;
 any return ANY;
-type return TYPE;
+type ID_OR(TYPE)
 true |
-True {yylval.BOOLEAN_LITERAL = true; return BOOLEAN_LITERAL;}
+True { yylval.BOOLEAN_LITERAL = true; return BOOLEAN_LITERAL;}
 false |
 False { yylval.BOOLEAN_LITERAL = false; return BOOLEAN_LITERAL; }
-"{" return '{';
-"}" return '}';
+"{" { ++curly_bracket_depth; return '{'; }
+"}" { --curly_bracket_depth; return '}'; }
 : return ':';
 "|" return '|';
 "<" return '<';
@@ -62,11 +70,11 @@ False { yylval.BOOLEAN_LITERAL = false; return BOOLEAN_LITERAL; }
 = return '=';
 "[" return '[';
 "]" return ']';
-{identifier} {yylval.ID = new IDRef(*addToStringTable()); return ID;}
+{identifier} { yylval.ID = addToStringTable(); return ID;}
 \? return '?';
 {string_literal1} |
 {string_literal2} { yylval.STRING_LITERAL = addToStringTable(); return STRING_LITERAL;}
-{number_literal}  return NUMBER_LITERAL;
+{number_literal} { yylval.NUMBER_LITERAL = atoi(yytext); return NUMBER_LITERAL;}
 {blank}
 %%
 
@@ -74,8 +82,9 @@ void yyerror (char const *s) {
   fprintf (stderr, "line: %d\n%s\n", yylineno, s);
 }
 
+
 StringRef * addToStringTable() {
-    StringTable.push_front(string(yytext));
-    return new StringRef(StringTable.front());
+    stringTable.push_front(string(yytext));
+    return new StringRef(stringTable.front());
 }
 

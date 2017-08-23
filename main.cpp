@@ -24,67 +24,13 @@ int main() {
   pre_dump();
 }
 
-StringMap<Value*> VariableTable;
-StringMap<JsonDict*> DictTable;
-StringMap<JsonTemplate*> TemplateTable;
-list<string> StringTable;
+StringMap<Value*> variableTable;
+StringMap<Type*> namedTypes;
+StringMap<JsonTemplate*> templateTable;
+list<string> stringTable;
 Json * json_root;
+list<Type*> typeTable;
 
-Value * addVariableDef(StringRef name, Value * v) {
-  bool ret = VariableTable.insert(make_pair(name, v)).second;
-  if (!ret) {
-    llvm::errs() << "error in addVariableDef(): variable already exists\n";
-    abort();
-  }
-  return v;
-}
-
-Value * getVariableValue(StringRef name) {
-  auto iter = VariableTable.find(name);
-  if (iter == VariableTable.end()) {
-    llvm::errs() << "error in getVariableValue(): variable not found\n";
-  }
-  return iter->getValue();
-}
-
-JsonDict * addDictDef(StringRef name, JsonDict * dict) {
-  bool ret = DictTable.insert(make_pair(name, dict)).second;
-  if (!ret) {
-    llvm::errs() << "error in addDictDef(): dict already exists\n";
-    abort();
-  }
-  return dict;
-}
-
-JsonDict * getDictDef(StringRef name) {
-  auto iter = DictTable.find(name);
-  if (iter == DictTable.end()) {
-    llvm::errs() << "error in getDictDef(): dict not found\n";
-    llvm::errs() << "line number: " << yylineno << '\n';
-    llvm::errs() << "dict name: " << name << '\n';
-    abort();
-  }
-  return iter->getValue();
-}
-
-JsonTemplate * addTemplateDef(StringRef name, JsonTemplate * temp) {
-  bool ret = TemplateTable.insert(make_pair(name, temp)).second;
-  if (!ret) {
-    llvm::errs() << "error in addTemplateDef(): template already exists\n";
-    abort();
-  }
-  return temp;
-}
-
-JsonTemplate * getTemplateDef(StringRef name) {
-  auto iter = TemplateTable.find(name);
-  if (iter == TemplateTable.end()) {
-    llvm::errs() << "error in getTemplateValue(): template not found\n";
-    llvm::errs() << "line number: " << yylineno << '\n';
-    llvm::errs() << "template name : " << name << '\n';
-    abort();
-  }
-  return iter->getValue();
-}
 
 #include "pre_dump.cpp"
+#include "codegen.cpp"

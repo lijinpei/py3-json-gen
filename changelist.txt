@@ -1,0 +1,5 @@
+216
+312
+InsertTextFormat
+MarkedString
+FormattingOptions [key: string]: boolean | number | string;

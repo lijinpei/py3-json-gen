@@ -23,17 +23,24 @@ public:
     llvm::outs() << boost::core::demangle(typeid(T).name());
   }
 
+  void operator()(TemplateParameter p) const {
+    llvm::outs() << "template parameter #" << p.pos;
+  }
+
+  void operator()(StringRef * s) const {
+    llvm::outs() << *s << "(unresolved interface name)";
+  }
   // we need this overload to handle NamedType
   void operator()(Type * t) const {
     boost::apply_visitor(TypeNameVisitor(), t->type);
   }
 
   void operator()(JsonDict * d) const {
-    llvm::outs() << "JsonDict " << d->name;
+    llvm::outs() << "JsonDict " << *d->name;
   }
 
   void operator()(TemplateID * t) const {
-    llvm::outs() << "TemplateID " << t->name << '<';
+    llvm::outs() << "TemplateID " << *t->name << '<';
     bool flag = false;
     for (auto & a : *(t->temp_arg_list)) {
       if (flag)
@@ -98,7 +105,7 @@ public:
     }
 
     void operator()(IDRef * i) const {
-      llvm::outs() << i->name << "(variable ref)";
+      llvm::outs() << *i->name << "(variable ref)";
     }
 
     void operator()(bool b) const {
@@ -147,7 +154,7 @@ void pre_dump(DictBody * b, const Twine & prefix) {
       llvm::outs() << ",\n";
     }
     flag = true;
-    llvm::outs() << prefix << m->name;
+    llvm::outs() << prefix << *m->name;
     auto & t = m->type_or_value->types;
     auto & v = m->type_or_value->values;
     if (t.size()) {
@@ -177,7 +184,7 @@ void pre_dump(DictBody * b, const Twine & prefix) {
 }
 
 void pre_dump(JsonDict * dict, const Twine & prefix) {
-  llvm::outs() << prefix << "JsonDict: " << dict->name;
+  llvm::outs() << prefix << "JsonDict: " << *dict->name;
   if (dict->base) {
     llvm::outs() << " extends ";
     boost::apply_visitor(TypeNameVisitor(), dict->base->type);
@@ -187,7 +194,7 @@ void pre_dump(JsonDict * dict, const Twine & prefix) {
 }
 
 void pre_dump(JsonTemplate * t, const Twine & prefix) {
-  llvm::outs() << prefix << "template: " << t->name << '<';
+  llvm::outs() << prefix << "template: " << *t->name << '<';
   bool flag = false;
   for (const auto v : *(t->temp_par_list)) {
     if (flag) {
@@ -201,20 +208,20 @@ void pre_dump(JsonTemplate * t, const Twine & prefix) {
 }
 
 void pre_dump(JsonNamespace * n, const Twine & prefix) {
-  llvm::outs() << prefix << "namespace: " << n->name << '\n';
+  llvm::outs() << prefix << "namespace: " << *n->name << '\n';
   const Twine pre1 = prefix + "    ";
   for (const auto & m : n->members) {
     pre_dump(m, pre1);
   }
 }
 void pre_dump(JsonType *t, const Twine & prefix) {
-  llvm::outs() << prefix << "type: " << t->name << ':';
+  llvm::outs() << prefix << "type: " << *t->name << ':';
   print_type(t->type);
   llvm::outs() << '\n';
 }
 
 void pre_dump(JsonVariable * v, const Twine & prefix) {
-  llvm::outs() << prefix << "variable: " << v->name;
+  llvm::outs() << prefix << "variable: " << *v->name;
   if (v->type) {
     llvm::outs() << " : ";
     print_type(v->type);
