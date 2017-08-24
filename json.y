@@ -333,7 +333,7 @@ val_seq
 /* JsonTemplate */
 json_template
   : INTERFACE ID '<'template_parameter_list '>' dict_body {
-    $$ = new JsonTemplate{$2, $4, $6};
+    $$ = new JsonTemplate{$2, $4, $6, 0};
     addTemplateDef($2, $$);
     resolveDictBody($6, $4);
   }
@@ -387,6 +387,7 @@ json_type
   : TYPE ID '=' type {
     $$ = new JsonType;
     $$->name = $2;
+    $$->alias_name = nullptr;
     Type * t = $4;
     if (boost::typeindex::type_id<StringRef*>() == t->type.type()) {
       StringRef * name = boost::get<StringRef*>(t->type);
@@ -395,7 +396,7 @@ json_type
         llvm::errs() << "Error when  declaring type alias: unknow type " << *name << "\naborting\n";
         abort();
       }
-      delete name;
+      $$->alias_name = name;
       delete $4;
     }
     $$->type = t;

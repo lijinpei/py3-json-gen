@@ -94,6 +94,7 @@ struct JsonTemplate {
   StringRef *name;
   TemplateParameterList *temp_par_list;
   DictBody *body;
+  int number;
 };
 
 using TemplateArgumentList = list<Type *>;
@@ -125,7 +126,10 @@ struct TemplateID {
   TemplateArgumentList *temp_arg_list;
   JsonTemplate *temp;
   DictBody *instantiation; // the Dict Body this template instantiate
+  int number = 0;
 
+  // This function bind template parameters to template arguments and generate
+  // the dictbody
   void Instantiate() {
     temp = getTemplateDef(name);
     if (nullptr == temp) {
@@ -215,6 +219,7 @@ struct JsonVariable {
 
 struct JsonType {
   StringRef *name;
+  StringRef *alias_name;
   Type *type;
 };
 
@@ -307,20 +312,34 @@ inline Type* checkTypeNameExists(StringRef * name) {
   }
   return res->getValue();
 }
+inline void resolveType(Type * & t) {
+  JsonList * list = nullptr;
+  Type * type = t;
+  if (boost::typeindex::type_id<JsonList*>() == t->type.type()) {
+    list = boost::get<JsonList*>(t->type);
+    type = list->type;
+  }
+  if (boost::typeindex::type_id<StringRef*>() == type->type.type()) {
+    StringRef *name = boost::get<StringRef*>(type->type);
+    Type * t1 = getNamedType(name);
+    if (t1 == nullptr) {
+      llvm::errs() << "Error in resolveType: unable to resolve type of dict memeber " << *name << "\naborting\n";
+      abort();
+    }
+    delete name;
+    if (list) {
+      delete list->type;
+      list->type = t1;
+    } else {
+      delete t;
+      t = t1;
+    }
+  }
+}
 
 inline void resolveTemplateArgumentList(TemplateArgumentList * tal) {
   for (auto & mber : *tal) {
-    if (boost::typeindex::type_id<StringRef*>() == mber->type.type()) {
-      StringRef * name = boost::get<StringRef*>(mber->type);
-      Type * t1 = getNamedType(name);
-      if (t1 == nullptr) {
-          llvm::errs() << "Error in resolveTemplateArgumentList(): unable to resolve type of template argument list " << *name << "\naborting\n";
-          abort();
-      }
-      delete name;
-      delete mber;
-      mber = t1;
-    }
+    resolveType(mber);
   }
 }
 
@@ -328,17 +347,7 @@ inline void resolveDictBody(DictBody * b) {
   for (auto & mber : b->members) {
     Types & types = mber->type_or_value->types;
     for (auto & t : types) {
-      if (boost::typeindex::type_id<StringRef*>() == t->type.type()) {
-        StringRef *name = boost::get<StringRef*>(t->type);
-        Type * t1 = getNamedType(name);
-        if (t1 == nullptr) {
-          llvm::errs() << "Error in resolveDictBody(): unable to resolve type of dict memeber " << *name << "\naborting\n";
-          abort();
-        }
-        delete name;
-        delete t;
-        t = t1;
-      }
+      resolveType(t);
     }
   }
 }

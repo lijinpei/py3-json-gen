@@ -5,3 +5,4 @@ json.tab.h
 lex.yy.c
 lexer
 test
+test.py

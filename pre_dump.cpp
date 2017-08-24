@@ -86,65 +86,73 @@ void print_type(Type * t) {
 
 class ValueVisitor : public boost::static_visitor<> {
 public:
-    void operator()(const SpecialValue & v) const {
+    void operator()(const SpecialValue & v, raw_ostream * outf_) const {
+      raw_ostream & outf = *outf_;
       switch (v) {
         case(SV_Any):
-          llvm::outs() << "any";
+          outf << "any";
           break;
         case(SV_JsonNull):
-          llvm::outs() << "null";
+          outf << "null";
           break;
         default:
-          llvm::outs() << "Error in ValueVisitor::ioerator(const SpecialValue &)\n"
+          outf << "Error in ValueVisitor::ioerator(const SpecialValue &)\n"
             "unknown enum valua\n" "aborting\n";
       }
     }
 
-    void operator()(StringRef * s) const {
-      llvm::outs() << *s;
+    void operator()(StringRef * s, raw_ostream * outf_) const {
+      raw_ostream & outf = *outf_;
+      outf << *s;
     }
 
-    void operator()(IDRef * i) const {
-      llvm::outs() << *i->name << "(variable ref)";
+    void operator()(IDRef * i, raw_ostream * outf_) const {
+      raw_ostream & outf = *outf_;
+      outf << *i->name << "(variable ref)";
     }
 
-    void operator()(bool b) const {
-      llvm::outs() << (b ? "true" : "false");
+    void operator()(bool b, raw_ostream * outf_) const {
+      raw_ostream & outf = *outf_;
+      outf << (b ? "true" : "false");
     }
 
-    void operator()(int i) const {
-      llvm::outs() << i;
+    void operator()(int i, raw_ostream * outf_) const {
+      raw_ostream & outf = *outf_;
+      outf << i;
     }
     
-    void operator()(DictLiteral *d) const {
-      llvm::outs() << '{';
+    void operator()(DictLiteral *d, raw_ostream * outf_) const {
+      raw_ostream & outf = *outf_;
+      outf << '{';
       bool flag = false;
       for (const auto & m : *(d->members)) {
         if (flag) {
-          llvm::outs() << ",\n";
+          outf << ",\n";
         }
-        llvm::outs() << m->str << ':';
-        boost::apply_visitor(ValueVisitor(), m->val->value);
+        outf << m->str << ':';
+        print_value(m->val, &llvm::outs());
       }
-      llvm::outs() << "\n}";
+      outf << "\n}";
     }
 
-    void operator()(ListLiteral *l) const {
-      llvm::outs() << '[';
+    void operator()(ListLiteral *l, raw_ostream * outf_) const {
+      raw_ostream & outf = *outf_;
+      outf << '[';
       bool flag = false;
       for (const auto & v : *(l->values)) {
         if (flag) {
-          llvm::outs() << ", ";
+          outf << ", ";
         }
         flag = true;
-        boost::apply_visitor(ValueVisitor(), v->value);
+        print_value(v, outf_);
       }
-      llvm::outs() << ']';
+      outf << ']';
     }
 };
 
-void print_value(Value * v) {
-  boost::apply_visitor(ValueVisitor(), v->value);
+void print_value(Value * v, raw_ostream * outf_) {
+  auto bound_visitor = std::bind(ValueVisitor(), std::placeholders::_1, outf_);
+  boost::apply_visitor(bound_visitor, v->value);
 }
 
 void pre_dump(DictBody * b, const Twine & prefix) {
@@ -176,7 +184,8 @@ void pre_dump(DictBody * b, const Twine & prefix) {
           llvm::outs() << " | ";
         }
         flag = true;
-        boost::apply_visitor(ValueVisitor(), v1->value);
+        print_value(v1, &llvm::outs());
+        //boost::apply_visitor(ValueVisitor(), v1->value);
       }
     }
   }
@@ -228,7 +237,7 @@ void pre_dump(JsonVariable * v, const Twine & prefix) {
   }
   if (v->value) {
     llvm::outs() << " = ";
-    print_value(v->value);
+    print_value(v->value, &llvm::outs());
   }
   llvm::outs() << '\n';
 }

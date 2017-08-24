@@ -2,7 +2,13 @@
 #define CODEGEN_H
 #include "boost/type_index.hpp"
 #include "boost/variant.hpp"
+#include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/FileSystem.h"
+#include <system_error>
 
+using llvm::raw_fd_ostream;
+
+void print_value(Value * v, raw_ostream * outf_);
 // all the named type that has been generated are added to this
 extern StringMap<Type*> generatedTypes;
 
@@ -32,11 +38,18 @@ inline Type *deepCopy(Type *t) {
   return new Type{t->type};
 }
 
+void codegen(JsonDict *d, raw_ostream *outf_, bool checkTempInst = true);
+void codegen(JsonTemplate *t, raw_ostream * outf_);
+void codegen(JsonNamespace *n, raw_ostream * outf_);
+void codegen(JsonType * t, raw_ostream * outf_);
+void codegen(JsonVariable * v, raw_ostream * outf_);
+void codegen(JsonExport * e, raw_ostream * outf_);
+void codegen(Type * t, raw_ostream * outf_);
+void codegen(Types * ts, raw_ostream * outf_);
+void codegen(raw_ostream * outf_);
 
-/* resolve t(which should have StringRef* as t->type) to a type(non StingRef*),
- * based on the current base stack, return the type resolved.
- */
-Type *resolveType(Type *t, list<StringRef *>&);
-void codegen();
-
+void checkTemplateInstantiation(Type *t, raw_ostream *outf_);
+void checkTemplateInstantiation(Types *ts, raw_ostream *outf_);
+void checkTemplateInstantiation(DictBody *b, raw_ostream *outf_);
+void checkTemplateInstantiation(JsonDict * d, raw_ostream *outf_);
 #endif // CODEGEN_H

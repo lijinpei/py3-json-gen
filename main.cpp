@@ -21,7 +21,11 @@ int main() {
     default:
       llvm::outs() << "wrong return value from yyparse()\n";
   }
-  pre_dump();
+  //pre_dump();
+  std::error_code ec;
+  raw_fd_ostream outf("test.py", ec,  llvm::sys::fs::OpenFlags::F_None);
+  //raw_fd_ostream outf(1, false);
+  codegen(&outf);
 }
 
 StringMap<Value*> variableTable;
